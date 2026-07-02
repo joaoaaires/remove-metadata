@@ -22,16 +22,29 @@ describe("BatchToolbar", () => {
     vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
   });
 
-  it("disables both actions when the queue is empty", () => {
-    render(<BatchToolbar images={[]} onRemoveAllForAllImages={vi.fn()} isBatchProcessing={false} />);
+  it("disables all actions when the queue is empty", () => {
+    render(
+      <BatchToolbar
+        images={[]}
+        onRemoveAllForAllImages={vi.fn()}
+        onClearCleanedImages={vi.fn()}
+        isBatchProcessing={false}
+      />,
+    );
     expect(screen.getByRole("button", { name: /remover todos os metadados/i })).toBeDisabled();
     expect(screen.getByRole("button", { name: /baixar tudo/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /limpar histórico/i })).toBeDisabled();
   });
 
   it("enables 'remove all' once there are queued images and calls the handler", async () => {
     const onRemoveAllForAllImages = vi.fn();
     render(
-      <BatchToolbar images={[makeImage()]} onRemoveAllForAllImages={onRemoveAllForAllImages} isBatchProcessing={false} />,
+      <BatchToolbar
+        images={[makeImage()]}
+        onRemoveAllForAllImages={onRemoveAllForAllImages}
+        onClearCleanedImages={vi.fn()}
+        isBatchProcessing={false}
+      />,
     );
     const button = screen.getByRole("button", { name: /remover todos os metadados/i });
     expect(button).toBeEnabled();
@@ -40,12 +53,26 @@ describe("BatchToolbar", () => {
   });
 
   it("disables 'remove all' while a batch operation is already in progress", () => {
-    render(<BatchToolbar images={[makeImage()]} onRemoveAllForAllImages={vi.fn()} isBatchProcessing />);
+    render(
+      <BatchToolbar
+        images={[makeImage()]}
+        onRemoveAllForAllImages={vi.fn()}
+        onClearCleanedImages={vi.fn()}
+        isBatchProcessing
+      />,
+    );
     expect(screen.getByRole("button", { name: /remover todos os metadados/i })).toBeDisabled();
   });
 
   it("keeps 'download all' disabled until at least one image has a cleaned blob", () => {
-    render(<BatchToolbar images={[makeImage()]} onRemoveAllForAllImages={vi.fn()} isBatchProcessing={false} />);
+    render(
+      <BatchToolbar
+        images={[makeImage()]}
+        onRemoveAllForAllImages={vi.fn()}
+        onClearCleanedImages={vi.fn()}
+        isBatchProcessing={false}
+      />,
+    );
     expect(screen.getByRole("button", { name: /baixar tudo/i })).toBeDisabled();
   });
 
@@ -54,12 +81,48 @@ describe("BatchToolbar", () => {
       makeImage({ id: "1", file: new File(["a"], "a.jpg"), cleaned: { blob: new Blob(["clean-a"]), url: "blob:a" } }),
       makeImage({ id: "2", file: new File(["b"], "b.jpg"), status: "ready" }), // not cleaned yet
     ];
-    render(<BatchToolbar images={images} onRemoveAllForAllImages={vi.fn()} isBatchProcessing={false} />);
+    render(
+      <BatchToolbar
+        images={images}
+        onRemoveAllForAllImages={vi.fn()}
+        onClearCleanedImages={vi.fn()}
+        isBatchProcessing={false}
+      />,
+    );
 
     const button = screen.getByRole("button", { name: /baixar tudo/i });
     expect(button).toBeEnabled();
     await userEvent.click(button);
 
     await waitFor(() => expect(HTMLAnchorElement.prototype.click).toHaveBeenCalledOnce());
+  });
+
+  it("keeps 'clear history' disabled until at least one image has been cleaned", () => {
+    render(
+      <BatchToolbar
+        images={[makeImage()]}
+        onRemoveAllForAllImages={vi.fn()}
+        onClearCleanedImages={vi.fn()}
+        isBatchProcessing={false}
+      />,
+    );
+    expect(screen.getByRole("button", { name: /limpar histórico/i })).toBeDisabled();
+  });
+
+  it("enables and triggers 'clear history' once an image has been cleaned", async () => {
+    const onClearCleanedImages = vi.fn();
+    const images = [makeImage({ id: "1", cleaned: { blob: new Blob(["clean-a"]), url: "blob:a" } })];
+    render(
+      <BatchToolbar
+        images={images}
+        onRemoveAllForAllImages={vi.fn()}
+        onClearCleanedImages={onClearCleanedImages}
+        isBatchProcessing={false}
+      />,
+    );
+    const button = screen.getByRole("button", { name: /limpar histórico/i });
+    expect(button).toBeEnabled();
+    await userEvent.click(button);
+    expect(onClearCleanedImages).toHaveBeenCalledOnce();
   });
 });

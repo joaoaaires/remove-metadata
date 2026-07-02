@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { readFileSync } from "node:fs";
 import path from "node:path";
@@ -133,5 +133,60 @@ describe("useImageQueue", () => {
       await runPromise;
     });
     expect(result.current.isBatchProcessing).toBe(false);
+  });
+
+  it("removeImage revokes the preview and cleaned URLs and drops the image from state", async () => {
+    const { result } = renderHook(() => useImageQueue());
+    const file = fixtureFile("with-all-metadata.jpg", "image/jpeg");
+    await act(async () => {
+      await result.current.addFiles([file]);
+    });
+    const imageId = result.current.images[0].id;
+    await act(async () => {
+      await result.current.removeAllFields(imageId);
+    });
+    const { previewUrl, cleaned } = result.current.images[0];
+
+    const revokeSpy = vi.spyOn(URL, "revokeObjectURL");
+    act(() => result.current.removeImage(imageId));
+
+    expect(result.current.images).toHaveLength(0);
+    expect(revokeSpy).toHaveBeenCalledWith(previewUrl);
+    expect(revokeSpy).toHaveBeenCalledWith(cleaned!.url);
+    revokeSpy.mockRestore();
+  });
+
+  it("clearCleanedImages removes only cleaned images and revokes their URLs", async () => {
+    const { result } = renderHook(() => useImageQueue());
+    const files = [fixtureFile("with-exif.jpg", "image/jpeg"), fixtureFile("with-all-metadata.jpg", "image/jpeg")];
+    await act(async () => {
+      await result.current.addFiles(files);
+    });
+    const [pendingId, cleanedId] = result.current.images.map((img) => img.id);
+    await act(async () => {
+      await result.current.removeAllFields(cleanedId);
+    });
+    const cleanedImage = result.current.images.find((img) => img.id === cleanedId)!;
+
+    const revokeSpy = vi.spyOn(URL, "revokeObjectURL");
+    act(() => result.current.clearCleanedImages());
+
+    expect(result.current.images).toHaveLength(1);
+    expect(result.current.images[0].id).toBe(pendingId);
+    expect(revokeSpy).toHaveBeenCalledWith(cleanedImage.previewUrl);
+    expect(revokeSpy).toHaveBeenCalledWith(cleanedImage.cleaned!.url);
+    revokeSpy.mockRestore();
+  });
+
+  it("clearCleanedImages is a no-op when there are no cleaned images", async () => {
+    const { result } = renderHook(() => useImageQueue());
+    const file = fixtureFile("with-exif.jpg", "image/jpeg");
+    await act(async () => {
+      await result.current.addFiles([file]);
+    });
+
+    act(() => result.current.clearCleanedImages());
+
+    expect(result.current.images).toHaveLength(1);
   });
 });

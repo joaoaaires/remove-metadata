@@ -13,6 +13,8 @@ function App() {
     removeSelectedFields,
     removeAllFields,
     removeAllFieldsForAllImages,
+    removeImage,
+    clearCleanedImages,
   } = useImageQueue();
 
   return (
@@ -31,6 +33,7 @@ function App() {
             <BatchToolbar
               images={images}
               onRemoveAllForAllImages={removeAllFieldsForAllImages}
+              onClearCleanedImages={clearCleanedImages}
               isBatchProcessing={isBatchProcessing}
             />
             <ImageQueueList
@@ -38,6 +41,7 @@ function App() {
               onToggleField={toggleFieldSelection}
               onRemoveSelected={removeSelectedFields}
               onRemoveAll={removeAllFields}
+              onRemoveImage={removeImage}
             />
           </>
         )}

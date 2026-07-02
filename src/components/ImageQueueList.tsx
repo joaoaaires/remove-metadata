@@ -6,9 +6,16 @@ type ImageQueueListProps = {
   onToggleField: (imageId: string, fieldId: string) => void;
   onRemoveSelected: (imageId: string) => void;
   onRemoveAll: (imageId: string) => void;
+  onRemoveImage: (imageId: string) => void;
 };
 
-export function ImageQueueList({ images, onToggleField, onRemoveSelected, onRemoveAll }: ImageQueueListProps) {
+export function ImageQueueList({
+  images,
+  onToggleField,
+  onRemoveSelected,
+  onRemoveAll,
+  onRemoveImage,
+}: ImageQueueListProps) {
   if (images.length === 0) return null;
 
   return (
@@ -20,6 +27,7 @@ export function ImageQueueList({ images, onToggleField, onRemoveSelected, onRemo
           onToggleField={onToggleField}
           onRemoveSelected={onRemoveSelected}
           onRemoveAll={onRemoveAll}
+          onRemoveImage={onRemoveImage}
         />
       ))}
     </div>

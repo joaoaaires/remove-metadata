@@ -120,6 +120,28 @@ export function useImageQueue() {
     }
   }, [removeAllFields]);
 
+  const revokeImageUrls = useCallback((image: QueuedImage) => {
+    URL.revokeObjectURL(image.previewUrl);
+    if (image.cleaned) URL.revokeObjectURL(image.cleaned.url);
+  }, []);
+
+  const removeImage = useCallback(
+    (imageId: string) => {
+      const target = imagesRef.current.find((img) => img.id === imageId);
+      if (!target) return;
+      revokeImageUrls(target);
+      setImages((prev) => prev.filter((img) => img.id !== imageId));
+    },
+    [revokeImageUrls],
+  );
+
+  const clearCleanedImages = useCallback(() => {
+    for (const img of imagesRef.current) {
+      if (img.cleaned) revokeImageUrls(img);
+    }
+    setImages((prev) => prev.filter((img) => !img.cleaned));
+  }, [revokeImageUrls]);
+
   return {
     images,
     isBatchProcessing,
@@ -128,5 +150,7 @@ export function useImageQueue() {
     removeSelectedFields,
     removeAllFields,
     removeAllFieldsForAllImages,
+    removeImage,
+    clearCleanedImages,
   };
 }

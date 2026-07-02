@@ -5,10 +5,11 @@ import type { QueuedImage } from "../features/metadata/types";
 type BatchToolbarProps = {
   images: QueuedImage[];
   onRemoveAllForAllImages: () => void;
+  onClearCleanedImages: () => void;
   isBatchProcessing: boolean;
 };
 
-export function BatchToolbar({ images, onRemoveAllForAllImages, isBatchProcessing }: BatchToolbarProps) {
+export function BatchToolbar({ images, onRemoveAllForAllImages, onClearCleanedImages, isBatchProcessing }: BatchToolbarProps) {
   const cleanedImages = images.filter((img) => img.cleaned);
 
   const handleDownloadAll = async () => {
@@ -27,6 +28,9 @@ export function BatchToolbar({ images, onRemoveAllForAllImages, isBatchProcessin
       </RetroButton>
       <RetroButton type="button" disabled={cleanedImages.length === 0} onClick={handleDownloadAll}>
         Baixar tudo (.zip)
+      </RetroButton>
+      <RetroButton type="button" disabled={cleanedImages.length === 0} onClick={onClearCleanedImages}>
+        Limpar histórico
       </RetroButton>
     </div>
   );

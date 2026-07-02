@@ -9,9 +9,10 @@ type ImageCardProps = {
   onToggleField: (imageId: string, fieldId: string) => void;
   onRemoveSelected: (imageId: string) => void;
   onRemoveAll: (imageId: string) => void;
+  onRemoveImage: (imageId: string) => void;
 };
 
-export function ImageCard({ image, onToggleField, onRemoveSelected, onRemoveAll }: ImageCardProps) {
+export function ImageCard({ image, onToggleField, onRemoveSelected, onRemoveAll, onRemoveImage }: ImageCardProps) {
   const actionsDisabled = image.isStripping || image.status !== "ready";
 
   return (
@@ -59,6 +60,10 @@ export function ImageCard({ image, onToggleField, onRemoveSelected, onRemoveAll 
               </div>
             </>
           )}
+
+          <RetroButton type="button" disabled={image.isStripping} onClick={() => onRemoveImage(image.id)}>
+            Remover da lista
+          </RetroButton>
         </div>
       </div>
     </RetroPanel>

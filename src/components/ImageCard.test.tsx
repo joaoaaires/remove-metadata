@@ -24,7 +24,13 @@ describe("ImageCard", () => {
 
   it("renders the file name and a thumbnail", () => {
     render(
-      <ImageCard image={makeImage()} onToggleField={vi.fn()} onRemoveSelected={vi.fn()} onRemoveAll={vi.fn()} />,
+      <ImageCard
+        image={makeImage()}
+        onToggleField={vi.fn()}
+        onRemoveSelected={vi.fn()}
+        onRemoveAll={vi.fn()}
+        onRemoveImage={vi.fn()}
+      />,
     );
     expect(screen.getByText("vacation.jpg")).toBeInTheDocument();
     expect(screen.getByRole("img", { name: /vacation\.jpg/i })).toHaveAttribute("src", "blob:preview-url");
@@ -37,6 +43,7 @@ describe("ImageCard", () => {
         onToggleField={vi.fn()}
         onRemoveSelected={vi.fn()}
         onRemoveAll={vi.fn()}
+        onRemoveImage={vi.fn()}
       />,
     );
     expect(screen.getByText(/lendo metadados/i)).toBeInTheDocument();
@@ -49,6 +56,7 @@ describe("ImageCard", () => {
         onToggleField={vi.fn()}
         onRemoveSelected={vi.fn()}
         onRemoveAll={vi.fn()}
+        onRemoveImage={vi.fn()}
       />,
     );
     expect(screen.getByText(/unknown file format/i)).toBeInTheDocument();
@@ -57,7 +65,13 @@ describe("ImageCard", () => {
   it("calls onToggleField when a metadata field checkbox is clicked", async () => {
     const onToggleField = vi.fn();
     render(
-      <ImageCard image={makeImage()} onToggleField={onToggleField} onRemoveSelected={vi.fn()} onRemoveAll={vi.fn()} />,
+      <ImageCard
+        image={makeImage()}
+        onToggleField={onToggleField}
+        onRemoveSelected={vi.fn()}
+        onRemoveAll={vi.fn()}
+        onRemoveImage={vi.fn()}
+      />,
     );
     await userEvent.click(screen.getByRole("checkbox", { name: /make/i }));
     expect(onToggleField).toHaveBeenCalledWith("img-1", "tiff:Make");
@@ -71,6 +85,7 @@ describe("ImageCard", () => {
         onToggleField={vi.fn()}
         onRemoveSelected={onRemoveSelected}
         onRemoveAll={vi.fn()}
+        onRemoveImage={vi.fn()}
       />,
     );
     expect(screen.getByRole("button", { name: /remover selecionados/i })).toBeDisabled();
@@ -84,6 +99,7 @@ describe("ImageCard", () => {
         onToggleField={vi.fn()}
         onRemoveSelected={onRemoveSelected}
         onRemoveAll={vi.fn()}
+        onRemoveImage={vi.fn()}
       />,
     );
     const button = screen.getByRole("button", { name: /remover selecionados/i });
@@ -95,7 +111,13 @@ describe("ImageCard", () => {
   it("triggers 'remove all' when clicked", async () => {
     const onRemoveAll = vi.fn();
     render(
-      <ImageCard image={makeImage()} onToggleField={vi.fn()} onRemoveSelected={vi.fn()} onRemoveAll={onRemoveAll} />,
+      <ImageCard
+        image={makeImage()}
+        onToggleField={vi.fn()}
+        onRemoveSelected={vi.fn()}
+        onRemoveAll={onRemoveAll}
+        onRemoveImage={vi.fn()}
+      />,
     );
     await userEvent.click(screen.getByRole("button", { name: /remover tudo/i }));
     expect(onRemoveAll).toHaveBeenCalledWith("img-1");
@@ -103,7 +125,13 @@ describe("ImageCard", () => {
 
   it("disables the download button until a cleaned blob is available", () => {
     render(
-      <ImageCard image={makeImage()} onToggleField={vi.fn()} onRemoveSelected={vi.fn()} onRemoveAll={vi.fn()} />,
+      <ImageCard
+        image={makeImage()}
+        onToggleField={vi.fn()}
+        onRemoveSelected={vi.fn()}
+        onRemoveAll={vi.fn()}
+        onRemoveImage={vi.fn()}
+      />,
     );
     expect(screen.getByRole("button", { name: /baixar/i })).toBeDisabled();
   });
@@ -116,6 +144,7 @@ describe("ImageCard", () => {
         onToggleField={vi.fn()}
         onRemoveSelected={vi.fn()}
         onRemoveAll={vi.fn()}
+        onRemoveImage={vi.fn()}
       />,
     );
     const button = screen.getByRole("button", { name: /baixar/i });
@@ -131,9 +160,43 @@ describe("ImageCard", () => {
         onToggleField={vi.fn()}
         onRemoveSelected={vi.fn()}
         onRemoveAll={vi.fn()}
+        onRemoveImage={vi.fn()}
       />,
     );
     expect(screen.getByRole("button", { name: /remover selecionados/i })).toBeDisabled();
     expect(screen.getByRole("button", { name: /remover tudo/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /remover da lista/i })).toBeDisabled();
+  });
+
+  it("enables and triggers 'remove from list' when not stripping", async () => {
+    const onRemoveImage = vi.fn();
+    render(
+      <ImageCard
+        image={makeImage()}
+        onToggleField={vi.fn()}
+        onRemoveSelected={vi.fn()}
+        onRemoveAll={vi.fn()}
+        onRemoveImage={onRemoveImage}
+      />,
+    );
+    const button = screen.getByRole("button", { name: /remover da lista/i });
+    expect(button).toBeEnabled();
+    await userEvent.click(button);
+    expect(onRemoveImage).toHaveBeenCalledWith("img-1");
+  });
+
+  it("allows removing an errored image from the list", async () => {
+    const onRemoveImage = vi.fn();
+    render(
+      <ImageCard
+        image={makeImage({ status: "error", errorMessage: "Unknown file format", fields: [] })}
+        onToggleField={vi.fn()}
+        onRemoveSelected={vi.fn()}
+        onRemoveAll={vi.fn()}
+        onRemoveImage={onRemoveImage}
+      />,
+    );
+    await userEvent.click(screen.getByRole("button", { name: /remover da lista/i }));
+    expect(onRemoveImage).toHaveBeenCalledWith("img-1");
   });
 });
