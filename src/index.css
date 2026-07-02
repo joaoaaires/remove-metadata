@@ -1,1 +1,21 @@
 @import "tailwindcss";
+
+@theme {
+  --font-mono: "Courier New", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --color-retro-bg: #008080;
+  --color-retro-panel: #c0c0c0;
+  --color-retro-panel-dark: #808080;
+  --color-retro-highlight: #ffffff;
+  --color-retro-shadow: #404040;
+  --color-retro-titlebar: #000080;
+  --color-retro-titlebar-text: #ffffff;
+  --color-retro-accent: #ff00ff;
+  --color-retro-text: #000000;
+}
+
+body {
+  background-color: var(--color-retro-bg);
+  font-family: var(--font-mono);
+  color: var(--color-retro-text);
+}
