@@ -61,4 +61,34 @@ describe("parseMetadata", () => {
     const author = fields.find((f) => f.kind === "text" && f.value === "Test PNG Author");
     expect(author).toBeDefined();
   });
+
+  it("lists a raw EXIF fallback block for a JPEG whose EXIF can't be decoded into fields", async () => {
+    const fields = await parseMetadata(fixtureFile("undecodable-exif.jpg", "image/jpeg"));
+    expect(fields).toEqual([{ id: "block:exif-raw", label: expect.any(String), value: "Present", kind: "block" }]);
+  });
+
+  it("lists a raw EXIF fallback block for a PNG whose eXIf chunk can't be decoded into fields", async () => {
+    const fields = await parseMetadata(fixtureFile("undecodable-exif.png", "image/png"));
+    expect(fields).toEqual([{ id: "block:exif-raw", label: expect.any(String), value: "Present", kind: "block" }]);
+  });
+
+  it("does not show the raw EXIF fallback block when structured EXIF fields were found", async () => {
+    const fields = await parseMetadata(fixtureFile("with-exif.jpg", "image/jpeg"));
+    expect(fields.some((f) => f.id === "block:exif-raw")).toBe(false);
+  });
+
+  it("flags C2PA/Content Credentials data as a block-level entry for a JPEG", async () => {
+    const fields = await parseMetadata(fixtureFile("with-c2pa.jpg", "image/jpeg"));
+    expect(fields).toContainEqual({ id: "block:c2pa", label: expect.any(String), value: "Present", kind: "block" });
+  });
+
+  it("flags C2PA/Content Credentials data as a block-level entry for a PNG", async () => {
+    const fields = await parseMetadata(fixtureFile("with-c2pa.png", "image/png"));
+    expect(fields).toContainEqual({ id: "block:c2pa", label: expect.any(String), value: "Present", kind: "block" });
+  });
+
+  it("does not show the C2PA block when no caBX/JUMBF segment is present", async () => {
+    const fields = await parseMetadata(fixtureFile("with-exif.jpg", "image/jpeg"));
+    expect(fields.some((f) => f.id === "block:c2pa")).toBe(false);
+  });
 });

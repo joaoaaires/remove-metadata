@@ -66,4 +66,72 @@ describe("stripAllMetadata", () => {
     const fields = await parseMetadata(cleaned);
     expect(fields).toEqual([]);
   });
+
+  it("removes a JPEG's raw-detected-but-undecodable EXIF segment", async () => {
+    const cleaned = await stripAllMetadata(fixtureFile("undecodable-exif.jpg", "image/jpeg"));
+    const fields = await parseMetadata(cleaned);
+    expect(fields).toEqual([]);
+  });
+
+  it("removes a PNG's raw-detected-but-undecodable eXIf chunk", async () => {
+    const cleaned = await stripAllMetadata(fixtureFile("undecodable-exif.png", "image/png"));
+    const fields = await parseMetadata(cleaned);
+    expect(fields).toEqual([]);
+  });
+});
+
+describe("stripMetadata — raw EXIF fallback", () => {
+  it("removes the raw EXIF segment from a JPEG when block:exif-raw is selected", async () => {
+    const file = fixtureFile("undecodable-exif.jpg", "image/jpeg");
+    const cleaned = await stripMetadata(file, new Set(["block:exif-raw"]));
+    const fields = await parseMetadata(cleaned);
+    expect(fields).toEqual([]);
+  });
+
+  it("removes the eXIf chunk from a PNG when block:exif-raw is selected", async () => {
+    const file = fixtureFile("undecodable-exif.png", "image/png");
+    const cleaned = await stripMetadata(file, new Set(["block:exif-raw"]));
+    const bytes = new Uint8Array(await cleaned.arrayBuffer());
+    const types = readPngChunks(bytes).map((c) => c.type);
+    expect(types).not.toContain("eXIf");
+  });
+
+  it("does not remove real EXIF/IPTC/XMP data when block:exif-raw isn't selected", async () => {
+    const file = fixtureFile("with-all-metadata.jpg", "image/jpeg");
+    const cleaned = await stripMetadata(file, new Set(["block:iptc"]));
+    const fields = await parseMetadata(cleaned);
+    expect(fields.some((f) => f.label === "Make")).toBe(true);
+    expect(fields.some((f) => f.id === "block:xmp")).toBe(true);
+  });
+});
+
+describe("stripMetadata — C2PA / Content Credentials", () => {
+  it("removes the JUMBF APP11 segment from a JPEG when block:c2pa is selected", async () => {
+    const file = fixtureFile("with-c2pa.jpg", "image/jpeg");
+    const cleaned = await stripMetadata(file, new Set(["block:c2pa"]));
+    const fields = await parseMetadata(cleaned);
+    expect(fields).toEqual([]);
+  });
+
+  it("removes the caBX chunk from a PNG when block:c2pa is selected", async () => {
+    const file = fixtureFile("with-c2pa.png", "image/png");
+    const cleaned = await stripMetadata(file, new Set(["block:c2pa"]));
+    const bytes = new Uint8Array(await cleaned.arrayBuffer());
+    const types = readPngChunks(bytes).map((c) => c.type);
+    expect(types).not.toContain("caBX");
+  });
+});
+
+describe("stripAllMetadata — C2PA / Content Credentials", () => {
+  it("removes C2PA data from a JPEG", async () => {
+    const cleaned = await stripAllMetadata(fixtureFile("with-c2pa.jpg", "image/jpeg"));
+    const fields = await parseMetadata(cleaned);
+    expect(fields).toEqual([]);
+  });
+
+  it("removes C2PA data from a PNG", async () => {
+    const cleaned = await stripAllMetadata(fixtureFile("with-c2pa.png", "image/png"));
+    const fields = await parseMetadata(cleaned);
+    expect(fields).toEqual([]);
+  });
 });

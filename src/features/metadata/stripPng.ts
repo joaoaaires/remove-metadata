@@ -1,6 +1,6 @@
 import { readPngChunks, writePngChunks, type PngChunk } from "./pngChunks";
 
-const REMOVABLE_CHUNK_TYPES = new Set(["tEXt", "zTXt", "iTXt", "eXIf", "tIME"]);
+const REMOVABLE_CHUNK_TYPES = new Set(["tEXt", "zTXt", "iTXt", "eXIf", "tIME", "caBX"]);
 
 export function removePngChunksMatching(
   bytes: Uint8Array,

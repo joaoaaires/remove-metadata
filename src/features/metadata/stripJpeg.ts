@@ -8,6 +8,8 @@ const IFD_BY_KIND: Record<string, "0th" | "Exif" | "GPS"> = {
 
 const IPTC_IDENTIFIER = "Photoshop 3.0\0";
 const XMP_IDENTIFIER = "http://ns.adobe.com/xap/1.0/\0";
+const EXIF_IDENTIFIER = "Exif\0\0";
+const JUMBF_IDENTIFIER = "JP";
 
 function uint8ToBinaryString(bytes: Uint8Array): string {
   let binary = "";
@@ -109,7 +111,10 @@ function removeJpegSegments(
   return out;
 }
 
-export function stripJpegBlocks(bytes: Uint8Array, blocks: Iterable<"iptc" | "xmp">): Uint8Array {
+export function stripJpegBlocks(
+  bytes: Uint8Array,
+  blocks: Iterable<"iptc" | "xmp" | "exif-raw" | "c2pa">,
+): Uint8Array {
   const blockSet = new Set(blocks);
   if (blockSet.size === 0) return bytes;
 
@@ -118,6 +123,12 @@ export function stripJpegBlocks(bytes: Uint8Array, blocks: Iterable<"iptc" | "xm
       return true;
     }
     if (marker === 0xe1 && blockSet.has("xmp") && payloadStartsWith(payload, XMP_IDENTIFIER)) {
+      return true;
+    }
+    if (marker === 0xe1 && blockSet.has("exif-raw") && payloadStartsWith(payload, EXIF_IDENTIFIER)) {
+      return true;
+    }
+    if (marker === 0xeb && blockSet.has("c2pa") && payloadStartsWith(payload, JUMBF_IDENTIFIER)) {
       return true;
     }
     return false;
@@ -132,5 +143,7 @@ export function removeAllJpegMetadata(bytes: Uint8Array): Uint8Array {
   } catch {
     withoutExif = bytes;
   }
-  return stripJpegBlocks(withoutExif, ["iptc", "xmp"]);
+  // piexif.remove can silently no-op (see catch above) on EXIF it can't structurally parse,
+  // so also strip the raw Exif APP1 segment by marker/identifier as a backstop.
+  return stripJpegBlocks(withoutExif, ["iptc", "xmp", "exif-raw", "c2pa"]);
 }

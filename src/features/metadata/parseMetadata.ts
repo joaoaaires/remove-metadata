@@ -1,10 +1,12 @@
 import exifr from "exifr";
 import { readPngChunks } from "./pngChunks";
-import { detectImageFormat } from "./imageFormat";
+import { detectImageFormat, type ImageFormat } from "./imageFormat";
 import type { MetadataField, MetadataFieldKind } from "./types";
 
 const EXCLUDED_GPS_KEYS = new Set(["latitude", "longitude"]);
 const PNG_TEXT_CHUNK_TYPES = new Set(["tEXt", "iTXt", "zTXt"]);
+const JPEG_EXIF_APP1_IDENTIFIER = "Exif\0\0";
+const JPEG_JUMBF_APP11_IDENTIFIER = "JP";
 
 function humanizeKey(key: string): string {
   return key
@@ -20,15 +22,20 @@ function formatValue(value: unknown): string {
 }
 
 async function readTiffExifGpsFields(file: Blob): Promise<MetadataField[]> {
-  const segmented = await exifr.parse(file, {
-    mergeOutput: false,
-    tiff: true,
-    exif: true,
-    gps: true,
-    ihdr: false,
-    iptc: false,
-    xmp: false,
-  });
+  let segmented: Awaited<ReturnType<typeof exifr.parse>>;
+  try {
+    segmented = await exifr.parse(file, {
+      mergeOutput: false,
+      tiff: true,
+      exif: true,
+      gps: true,
+      ihdr: false,
+      iptc: false,
+      xmp: false,
+    });
+  } catch {
+    segmented = undefined;
+  }
   if (!segmented) return [];
 
   const fields: MetadataField[] = [];
@@ -134,15 +141,137 @@ async function readPngTextFields(file: Blob): Promise<MetadataField[]> {
   return fields;
 }
 
+function payloadStartsWithIdentifier(payload: Uint8Array, identifier: string): boolean {
+  const idBytes = new TextEncoder().encode(identifier);
+  if (payload.length < idBytes.length) return false;
+  for (let k = 0; k < idBytes.length; k++) {
+    if (payload[k] !== idBytes[k]) return false;
+  }
+  return true;
+}
+
+/**
+ * A TIFF/IFD is only worth surfacing if its 0th IFD actually declares at least one entry.
+ * `piexif` round-trips (e.g. a no-op field removal) can leave behind a structurally valid but
+ * entirely empty EXIF segment — that's not "hidden data", so it must not trip the fallback.
+ */
+function tiffIfd0HasEntries(tiff: Uint8Array): boolean {
+  if (tiff.length < 8) return false;
+  const isLittleEndian = tiff[0] === 0x49 && tiff[1] === 0x49; // "II"
+  const isBigEndian = tiff[0] === 0x4d && tiff[1] === 0x4d; // "MM"
+  if (!isLittleEndian && !isBigEndian) return false;
+  const view = new DataView(tiff.buffer, tiff.byteOffset, tiff.byteLength);
+  if (view.getUint16(2, isLittleEndian) !== 42) return false;
+  const ifd0Offset = view.getUint32(4, isLittleEndian);
+  if (ifd0Offset + 2 > tiff.length) return false;
+  return view.getUint16(ifd0Offset, isLittleEndian) > 0;
+}
+
+/** Detects a JPEG APP1 "Exif" segment by walking markers, independent of whether the IFD inside it can be decoded. */
+function hasRawJpegExifSegment(bytes: Uint8Array): boolean {
+  let i = 2;
+  while (i < bytes.length) {
+    if (bytes[i] !== 0xff) break;
+    const marker = bytes[i + 1];
+    if (marker === 0xd8 || marker === 0x01 || (marker >= 0xd0 && marker <= 0xd7)) {
+      i += 2;
+      continue;
+    }
+    if (marker === 0xda) break;
+    const len = (bytes[i + 2] << 8) | bytes[i + 3];
+    if (marker === 0xe1) {
+      const payload = bytes.subarray(i + 4, i + 2 + len);
+      if (
+        payloadStartsWithIdentifier(payload, JPEG_EXIF_APP1_IDENTIFIER) &&
+        tiffIfd0HasEntries(payload.subarray(JPEG_EXIF_APP1_IDENTIFIER.length))
+      ) {
+        return true;
+      }
+    }
+    i += 2 + len;
+  }
+  return false;
+}
+
+function hasRawPngExifChunk(bytes: Uint8Array): boolean {
+  return readPngChunks(bytes).some((chunk) => chunk.type === "eXIf" && tiffIfd0HasEntries(chunk.data));
+}
+
+/**
+ * C2PA "Content Credentials" (AI provenance) manifests are stored as JUMBF (ISO 19566-5) boxes,
+ * a container format unrelated to EXIF/IPTC/XMP — exifr and the PNG text-chunk reader never see
+ * them. JPEG carries JUMBF across one or more APP11 segments, each starting with the "JP" common
+ * identifier; PNG carries it in a single ancillary "caBX" chunk. We only detect presence here,
+ * not decode the manifest into individual fields.
+ */
+function hasRawJpegC2paSegment(bytes: Uint8Array): boolean {
+  let i = 2;
+  while (i < bytes.length) {
+    if (bytes[i] !== 0xff) break;
+    const marker = bytes[i + 1];
+    if (marker === 0xd8 || marker === 0x01 || (marker >= 0xd0 && marker <= 0xd7)) {
+      i += 2;
+      continue;
+    }
+    if (marker === 0xda) break;
+    const len = (bytes[i + 2] << 8) | bytes[i + 3];
+    if (marker === 0xeb) {
+      const payload = bytes.subarray(i + 4, i + 2 + len);
+      if (payloadStartsWithIdentifier(payload, JPEG_JUMBF_APP11_IDENTIFIER)) return true;
+    }
+    i += 2 + len;
+  }
+  return false;
+}
+
+function hasRawPngC2paChunk(bytes: Uint8Array): boolean {
+  return readPngChunks(bytes).some((chunk) => chunk.type === "caBX");
+}
+
+async function readC2paPresenceField(file: Blob, format: ImageFormat): Promise<MetadataField[]> {
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const hasC2pa = format === "png" ? hasRawPngC2paChunk(bytes) : hasRawJpegC2paSegment(bytes);
+  if (!hasC2pa) return [];
+  return [
+    {
+      id: "block:c2pa",
+      label: "Dados C2PA / Content Credentials (proveniência de IA)",
+      value: "Present",
+      kind: "block",
+    },
+  ];
+}
+
+/**
+ * Fallback for EXIF data that exists in the file but couldn't be resolved into individual
+ * fields by exifr (e.g. an unusual IFD layout) — only used when the structured decode found nothing.
+ */
+async function readRawExifFallbackField(file: Blob, format: ImageFormat): Promise<MetadataField[]> {
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const hasRawExif = format === "png" ? hasRawPngExifChunk(bytes) : hasRawJpegExifSegment(bytes);
+  if (!hasRawExif) return [];
+  return [
+    {
+      id: "block:exif-raw",
+      label: "Dados EXIF (detectados, não foi possível listar campos individuais)",
+      value: "Present",
+      kind: "block",
+    },
+  ];
+}
+
 export async function parseMetadata(file: Blob): Promise<MetadataField[]> {
   const format = await detectImageFormat(file);
 
   const tiffExifGps = await readTiffExifGpsFields(file);
+  const rawExifFallback = tiffExifGps.length === 0 ? await readRawExifFallbackField(file, format) : [];
+  const c2pa = await readC2paPresenceField(file, format);
+
   if (format === "png") {
     const textFields = await readPngTextFields(file);
-    return [...tiffExifGps, ...textFields];
+    return [...tiffExifGps, ...rawExifFallback, ...c2pa, ...textFields];
   }
 
   const blockFields = await readBlockPresenceFields(file);
-  return [...tiffExifGps, ...blockFields];
+  return [...tiffExifGps, ...rawExifFallback, ...c2pa, ...blockFields];
 }

@@ -178,4 +178,55 @@ writeFileSync(
   buildPng([tExtChunk, tImeChunk, iTXtChunk, eXIfChunk]),
 );
 
+// --- Undecodable-but-present EXIF fixtures ---
+// A structurally-present TIFF/IFD whose entry offset points outside the buffer. exifr swallows
+// the internal read error and returns no ifd0/exif/gps groups (verified against exifr 7.1.3),
+// which is exactly the "raw EXIF exists but can't be field-parsed" case this change handles.
+function buildHostileTiff() {
+  const header = Buffer.alloc(8);
+  header.write("II", 0, "ascii");
+  header.writeUInt16LE(42, 2);
+  header.writeUInt32LE(8, 4); // IFD0 offset = 8, right after header
+
+  const ifd0 = Buffer.alloc(2 + 12 + 4);
+  ifd0.writeUInt16LE(1, 0); // 1 entry
+  ifd0.writeUInt16LE(0x0110, 2); // tag: Model
+  ifd0.writeUInt16LE(2, 4); // type: ASCII
+  ifd0.writeUInt32LE(100, 6); // count: 100 bytes
+  ifd0.writeUInt32LE(9999, 10); // value offset: far outside the buffer
+  ifd0.writeUInt32LE(0, 14); // next IFD offset: none
+
+  return Buffer.concat([header, ifd0]);
+}
+
+const hostileTiff = buildHostileTiff();
+
+const exifRawSegment = buildJpegSegment(0xe1, Buffer.concat([Buffer.from("Exif\0\0", "ascii"), hostileTiff]));
+writeFileSync(
+  path.join(fixturesDir, "undecodable-exif.jpg"),
+  insertSegmentsAfterSoi(cleanBase, [exifRawSegment]),
+);
+
+const undecodableExifChunk = pngChunk("eXIf", hostileTiff);
+writeFileSync(path.join(fixturesDir, "undecodable-exif.png"), buildPng([undecodableExifChunk]));
+
+// --- C2PA (Content Credentials) fixtures ---
+// C2PA manifests are stored as JUMBF (ISO 19566-5) boxes: APP11 segments in JPEG (identified by
+// the "JP" common identifier) and a "caBX" ancillary chunk in PNG. We only need presence detection,
+// not full JUMBF/CBOR parsing, so a minimal placeholder payload is enough for the fixtures.
+function buildJumbfApp11(boxData) {
+  const header = Buffer.alloc(8);
+  header.write("JP", 0, "ascii"); // common identifier for JUMBF marker segments
+  header.writeUInt16BE(1, 2); // box instance number
+  header.writeUInt32BE(1, 4); // packet sequence number
+  return buildJpegSegment(0xeb, Buffer.concat([header, boxData]));
+}
+
+const c2paPlaceholder = Buffer.from("jumbc2pa placeholder manifest", "ascii");
+const c2paSegment = buildJumbfApp11(c2paPlaceholder);
+writeFileSync(path.join(fixturesDir, "with-c2pa.jpg"), insertSegmentsAfterSoi(cleanBase, [c2paSegment]));
+
+const caBXChunk = pngChunk("caBX", c2paPlaceholder);
+writeFileSync(path.join(fixturesDir, "with-c2pa.png"), buildPng([caBXChunk]));
+
 console.log("Fixtures written to", fixturesDir);

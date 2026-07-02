@@ -15,7 +15,7 @@ async function stripJpeg(file: File, selectedFieldIds: ReadonlySet<string>): Pro
   const fieldIds = [...selectedFieldIds].filter((id) => TIFF_LIKE_PREFIXES.some((p) => id.startsWith(p)));
   const blocks = [...selectedFieldIds]
     .filter((id) => id.startsWith("block:"))
-    .map((id) => id.slice("block:".length)) as Array<"iptc" | "xmp">;
+    .map((id) => id.slice("block:".length)) as Array<"iptc" | "xmp" | "exif-raw" | "c2pa">;
 
   const withoutFields = stripJpegFields(bytes, fieldIds);
   const withoutBlocks = stripJpegBlocks(withoutFields, blocks);
@@ -25,7 +25,10 @@ async function stripJpeg(file: File, selectedFieldIds: ReadonlySet<string>): Pro
 async function stripPng(file: File, selectedFieldIds: ReadonlySet<string>): Promise<Blob> {
   const bytes = new Uint8Array(await file.arrayBuffer());
 
-  const removeExif = [...selectedFieldIds].some((id) => TIFF_LIKE_PREFIXES.some((p) => id.startsWith(p)));
+  const removeExif = [...selectedFieldIds].some(
+    (id) => TIFF_LIKE_PREFIXES.some((p) => id.startsWith(p)) || id === "block:exif-raw",
+  );
+  const removeC2pa = selectedFieldIds.has("block:c2pa");
   const textIndexes = new Set(
     [...selectedFieldIds]
       .filter((id) => id.startsWith("text:"))
@@ -34,7 +37,8 @@ async function stripPng(file: File, selectedFieldIds: ReadonlySet<string>): Prom
 
   const stripped = removePngChunksMatching(
     bytes,
-    (chunk, index) => (removeExif && chunk.type === "eXIf") || textIndexes.has(index),
+    (chunk, index) =>
+      (removeExif && chunk.type === "eXIf") || (removeC2pa && chunk.type === "caBX") || textIndexes.has(index),
   );
   return toBlob(stripped, file.type || "image/png");
 }

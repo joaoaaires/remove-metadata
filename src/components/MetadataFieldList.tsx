@@ -9,7 +9,7 @@ type MetadataFieldListProps = {
 const SECTIONS: Array<{ key: string; title: string; kinds: MetadataField["kind"][] }> = [
   { key: "exif", title: "EXIF / GPS", kinds: ["tiff", "exif", "gps"] },
   { key: "text", title: "Texto (PNG)", kinds: ["text"] },
-  { key: "block", title: "IPTC / XMP", kinds: ["block"] },
+  { key: "block", title: "IPTC / XMP / Outros", kinds: ["block"] },
 ];
 
 export function MetadataFieldList({ fields, selected, onToggle }: MetadataFieldListProps) {

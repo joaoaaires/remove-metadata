@@ -37,4 +37,32 @@ describe("App", () => {
     await waitFor(() => expect(screen.getByText(/nenhum metadado encontrado/i)).toBeInTheDocument());
     expect(screen.getByRole("button", { name: /^baixar$/i })).toBeEnabled();
   });
+
+  it("shows the raw EXIF fallback (not 'no metadata found') for a JPEG exifr can't decode, and can remove it", async () => {
+    render(<App />);
+    const input = screen.getByLabelText(/escolher imagens/i);
+    await userEvent.upload(input, fixtureFile("undecodable-exif.jpg", "image/jpeg"));
+
+    await waitFor(() => expect(screen.getByText(/dados exif/i)).toBeInTheDocument());
+    expect(screen.queryByText(/nenhum metadado encontrado/i)).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: /remover tudo/i }));
+
+    await waitFor(() => expect(screen.getByText(/nenhum metadado encontrado/i)).toBeInTheDocument());
+    expect(screen.getByRole("button", { name: /^baixar$/i })).toBeEnabled();
+  });
+
+  it("shows the raw EXIF fallback for a PNG exifr can't decode, and can remove it", async () => {
+    render(<App />);
+    const input = screen.getByLabelText(/escolher imagens/i);
+    await userEvent.upload(input, fixtureFile("undecodable-exif.png", "image/png"));
+
+    await waitFor(() => expect(screen.getByText(/dados exif/i)).toBeInTheDocument());
+    expect(screen.queryByText(/nenhum metadado encontrado/i)).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: /remover tudo/i }));
+
+    await waitFor(() => expect(screen.getByText(/nenhum metadado encontrado/i)).toBeInTheDocument());
+    expect(screen.getByRole("button", { name: /^baixar$/i })).toBeEnabled();
+  });
 });
