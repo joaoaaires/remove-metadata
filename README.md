@@ -1,75 +1,29 @@
-# React + TypeScript + Vite
+# metadata-scrubber
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A browser-only tool for inspecting and stripping hidden metadata (EXIF, GPS, IPTC, XMP, PNG text chunks) from JPEG and PNG images before you share them.
 
-Currently, two official plugins are available:
+Upload one or more images, review the metadata fields attached to each, and remove selected fields or all of them — individually or across the whole batch. Everything runs client-side: images are never uploaded to a server.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Tech stack
 
-## React Compiler
+- React 19 + TypeScript
+- Vite
+- Tailwind CSS v4 (retro-styled UI)
+- [`exifr`](https://github.com/MikeKovarik/exifr) for parsing EXIF/GPS/IPTC/XMP metadata
+- [`piexifjs`](https://github.com/hMatoba/piexifjs) and custom PNG-chunk handling for stripping metadata
+- [`jszip`](https://github.com/Stuk/jszip) for batch/zip downloads
+- Vitest + Testing Library for tests
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Scripts
 
-## Expanding the ESLint configuration
+- `yarn dev` — start the Vite dev server
+- `yarn build` — type-check (`tsc -b`) and build for production
+- `yarn lint` — run ESLint
+- `yarn test` — run the test suite once
+- `yarn test:watch` — run tests in watch mode
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## Project structure
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-
-```
-
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
-
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-
-```
+- `src/components` — UI components (upload dropzone, image queue, batch toolbar, metadata field list) and the `retro/` themed building blocks
+- `src/features/metadata` — core logic: parsing metadata, stripping EXIF/PNG chunks, image format detection, download/zip generation, and the `useImageQueue` hook
+- `src/test/fixtures` — sample JPEG/PNG images used by the test suite (with/without metadata, C2PA, undecodable EXIF, etc.)
