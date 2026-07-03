@@ -1,0 +1,5 @@
+User-agent: *
+
+Allow: /
+
+Sitemap: https://remove-metadata-seven.vercel.app/sitemap.xml
